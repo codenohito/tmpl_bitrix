@@ -1,0 +1,28 @@
+# See https://help.github.com/articles/ignoring-files for more about ignoring files.
+
+# Ignore all tempfiles
+/tmp
+
+# In any case keep /public directory
+!/public/.keep
+
+# Ignore systems and tools files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+
+Session.vim
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+.idea
