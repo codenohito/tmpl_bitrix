@@ -3,8 +3,12 @@
 # Ignore all tempfiles
 /tmp
 
-# In any case keep /public directory
+# Application
+/public/*
 !/public/.keep
+# !/public/.htaccess
+# !/public/robots.txt
+
 
 # Ignore systems and tools files
 .DS_Store
