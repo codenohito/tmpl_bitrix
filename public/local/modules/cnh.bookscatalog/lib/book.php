@@ -6,6 +6,8 @@ use Bitrix\Main\Type;
 
 class BookTable extends Entity\DataManager
 {
+	const UF_ID;
+
 	public static function getTableName()
 	{
 		return 'cnh_books_catalog_book'
@@ -13,7 +15,7 @@ class BookTable extends Entity\DataManager
 
 	public static function getUfId()
 	{
-		return 'THE_BOOK';
+		return self::UF_ID;
 	}
 
 	public static function getMap()
