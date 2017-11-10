@@ -6,9 +6,10 @@
 # Application
 /public/*
 !/public/.keep
+!/public/local/
 # !/public/.htaccess
 # !/public/robots.txt
-
+# !/public/some-part-of-the-site
 
 # Ignore systems and tools files
 .DS_Store
