@@ -17,6 +17,8 @@ This is a template of Bitrix Framework project.
 
 Он будет виден в админке на странице «Рабочий стол» / «Marketplace» /
 [«Установленные решения»](http://template.bitrix/bitrix/admin/partner_modules.php?lang=ru).
+Там же можно его установить.
+
 После установки появится возможность настроить его на странице админки
 «Настройки» -> «Настройки продукта» -> «Настройки модулей», и выбрать
 [«CNH Книжный каталог»](http://template.bitrix/bitrix/admin/settings.php?lang=ru&mid=cnh.bookscatalog)
