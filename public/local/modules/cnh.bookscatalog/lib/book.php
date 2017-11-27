@@ -1,16 +1,20 @@
 <?php
+
 namespace Cnh\BooksCatalog;
 
 use Bitrix\Main\Entity;
 use Bitrix\Main\Type;
+use Bitrix\Main\Localization\Loc;
+
+Loc::loadMessages(__FILE__);
 
 class BookTable extends Entity\DataManager
 {
-	const UF_ID;
+	const UF_ID = "dfsdfs";
 
 	public static function getTableName()
 	{
-		return 'cnh_books_catalog_book'
+		return 'cnh_bookscatalog_book';
 	}
 
 	public static function getUfId()
@@ -24,6 +28,7 @@ class BookTable extends Entity\DataManager
 			new Entity\IntegerField('ID', array(
 				'primary' => true,
 				'autocomplete' => true,
+				'title' => Loc::getMessage('CHN_BOOKSCATALOG_BOOK_ID')
 			)),
 			new Entity\StringField('ISBN',array(
 				'required' => true,
@@ -52,7 +57,7 @@ class BookTable extends Entity\DataManager
 			)),
 			new Entity\TextField('EDITIONS_ISBN', array(
 				'serialized' => true
-			))
+			)),
 			new Entity\StringField('TITLE'),
 			new Entity\DateField('PUBLISH_DATE', array(
 				'default_value' => new Type\Date

@@ -1,5 +1,5 @@
 <?
-$support_default_option = array(
-	"BOOKS_PER_PAGE" => 10
+$cgn_bookscatalog_default_option = array(
+	"books_per_page" => 10
 );
 ?>

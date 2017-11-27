@@ -1,0 +1,3 @@
+<?php
+
+$MESS['CHN_BOOKSCATALOG_BOOK_ID'] = 'ID';

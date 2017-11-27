@@ -14,3 +14,14 @@ This is a template of Bitrix Framework project.
 до точки является идентификатором партнёра. В данном случае 'cnh' является
 сокращением от 'CodeNoHito'.
 Код модуля расположен в директории `/public/local/modules/cnh.bookscatalog`.
+
+Он будет виден в админке на странице «Рабочий стол» / «Marketplace» /
+[«Установленные решения»](http://template.bitrix/bitrix/admin/partner_modules.php?lang=ru).
+После установки появится возможность настроить его на странице админки
+«Настройки» -> «Настройки продукта» -> «Настройки модулей», и выбрать
+[«CNH Книжный каталог»](http://template.bitrix/bitrix/admin/settings.php?lang=ru&mid=cnh.bookscatalog)
+
+https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=101&LESSON_ID=2902
+
+
+https://github.com/bitrix-expert/bex.d7dull

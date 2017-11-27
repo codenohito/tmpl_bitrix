@@ -8,7 +8,7 @@ class TagTable extends Entity\DataManager
 {
 	public static function getTableName()
 	{
-		return 'cnh_books_catalog_tag';
+		return 'cnh_bookscatalog_tag';
 	}
 
 	public static function getMap()

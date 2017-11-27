@@ -1,0 +1,4 @@
+<?php
+
+$MESS['CHN_BOOKSCATALOG_MENU_TITLE'] = 'Книжный';
+$MESS['CHN_BOOKSCATALOG_SUBMENU_TITLE'] = 'Книги';

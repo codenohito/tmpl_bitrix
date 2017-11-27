@@ -8,7 +8,7 @@ class AuthorTable extends Entity\DataManager
 {
 	public static function getTableName()
 	{
-		return 'cnh_books_catalog_author';
+		return 'cnh_bookscatalog_author';
 	}
 
 	public static function getMap()
