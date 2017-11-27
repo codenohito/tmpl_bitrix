@@ -3,6 +3,9 @@
 namespace Cnh\BooksCatalog;
 
 use Bitrix\Main\Entity;
+use Bitrix\Main\Localization\Loc;
+
+Loc::loadMessages(__FILE__);
 
 class AuthorTable extends Entity\DataManager
 {
@@ -16,10 +19,16 @@ class AuthorTable extends Entity\DataManager
 		return array(
 			new Entity\IntegerField('ID', array(
 				'primary' => true,
-				'autocomplete' => true
+				'autocomplete' => true,
+				'title' => Loc::getMessage('CHN_BOOKSCATALOG_AUTHOR_ID')
 			)),
-			new Entity\StringField('NAME'),
-			new Entity\StringField('LAST_NAME')
+			new Entity\StringField('NAME', array(
+				'required' => true,
+				'title' => Loc::getMessage('CHN_BOOKSCATALOG_AUTHOR_NAME')
+			)),
+			new Entity\StringField('LAST_NAME', array(
+				'title' => Loc::getMessage('CHN_BOOKSCATALOG_AUTHOR_LAST_NAME')
+			))
 		);
 	}
 }
