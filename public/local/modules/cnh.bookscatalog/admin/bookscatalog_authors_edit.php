@@ -7,171 +7,206 @@ use Cnh\BooksCatalog\AuthorTable;
 
 defined('ADMIN_MODULE_NAME') or define('ADMIN_MODULE_NAME', 'cnh.bookscatalog');
 
+$arAdminUrls = array(
+	'list' => 'bookscatalog_authors_list.php',
+	'edit' => 'bookscatalog_authors_edit.php'
+);
+
 require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/prolog_admin_before.php';
 
 Loc::loadMessages(__FILE__);
 
-if (!CModule::IncludeModule(ADMIN_MODULE_NAME))
+// проверяем, подключен ли наш модуль и есть ли на него права у текущего пользователя
+$POST_RIGHT = $APPLICATION->GetGroupRight(ADMIN_MODULE_NAME);
+if ((!CModule::IncludeModule(ADMIN_MODULE_NAME)) || ($POST_RIGHT == "D"))
 {
 	$APPLICATION->AuthForm(GetMessage("ACCESS_DENIED"));
 }
 
-$is_create_form = true;
-$is_update_form = false;
-
-$isEditMode = true;
-
-$errors = array();
-
-$entity = AuthorTable::getEntity();
-$entity_data_class = $entity->getDataClass();
-$entity_table_name = AuthorTable::getTableName();
-
-// get row
-$row = null;
-
-if (isset($_REQUEST['ID']) && $_REQUEST['ID'] > 0)
-{
-	$row = $entity_data_class::getById($_REQUEST['ID'])->fetch();
-
-	if (!empty($row))
-	{
-		$is_update_form = true;
-		$is_create_form = false;
-	}
-	else
-	{
-		$row = null;
-	}
-}
-
-if ($is_create_form)
-{
-	$APPLICATION->SetTitle('Создание автора');
-}
-else
-{
-	$APPLICATION->SetTitle('Редактирование автора');
-}
-
-// form
+// Добавляем закладки страницы
+// Делаем это до всех остальных данных, так как нам пригодится этот объект
+// для формирования верной ссылки редиректа после сохранения
 $aTabs = array(
-	array("DIV" => "edit1", "TAB" => 'Автор', "ICON"=>"ad_contract_edit", "TITLE"=> 'Автор')
+	array("DIV" => "edit1", "TAB" => "Автор", "ICON"=>"main_user_edit", "TITLE"=>"Автор")
 );
+$tabControl = new CAdminTabControl("tabControl", $aTabs);
 
-$tabControl = new CAdminForm("hlrow_edit_DocumentTable", $aTabs);
+// Объявляем несколько важных переменных
+$ID = intval($ID);      // идентификатор редактируемой записи // intval($_REQUEST['ID'])
+$errMessages = null;    // сообщения об ошибке
+$bVarsFromForm = false; // флаг "Данные получены с формы"
 
-// delete action
-if ($is_update_form && isset($_REQUEST['action']) && $_REQUEST['action'] === 'delete' && check_bitrix_sessid())
+// ************************************************************************** //
+//         Обработка и сохранение изменений                                   //
+// ************************************************************************** //
+
+// Удаление записи
+if(($ID > 0)
+		&& $action == 'delete' // $_REQUEST['action']
+		&& $POST_RIGHT == "W"
+		&& check_bitrix_sessid()
+)
 {
-
-	// if( Access::getInstance()->checkRigth__Document($row['ID']) ) {
-		$entity_data_class::delete($row['ID']);
-	// }
-
-
-	LocalRedirect("bookscatalog_authors_list.php?lang=".LANGUAGE_ID);
+	AuthorTable::delete($ID);
+	LocalRedirect($arAdminUrls['list']."?lang=".LANG);
 }
 
-// save action
-if ((strlen($save)>0 || strlen($apply)>0) && $REQUEST_METHOD=="POST" && check_bitrix_sessid())
+// Сохранение или обновление записи
+if($REQUEST_METHOD == "POST"
+		&& ($save != "" || $apply != "") // $_REQUEST['save']
+		&& $POST_RIGHT == "W"
+		&& check_bitrix_sessid()
+)
 {
-	$data = array();
-//	$USER_FIELD_MANAGER->EditFormAddFields('HLBLOCK_DocumentTable', $data);
-	$data = array(
-		'NAME' => $_POST['NAME'],
-		'LAST_NAME' => $_POST['LAST_NAME']
+	// обработка данных формы
+	$arFields = Array(
+		'NAME'      => $NAME,     // $_POST['NAME'],
+		'LAST_NAME' => $LAST_NAME // $_POST['LAST_NAME'],
 	);
 
-	/** @param Bitrix\Main\Entity\AddResult $result */
-	if ($is_update_form)
+	// сохранение данных
+	if($ID > 0)
 	{
-		$ID = intval($_REQUEST['ID']);
-		$result = $entity_data_class::update($ID, $data);
+		$result = AuthorTable::update($ID, $arFields);
 	}
 	else
 	{
-		$result = $entity_data_class::add($data);
+		$result = AuthorTable::add($arFields);
 		$ID = $result->getId();
 	}
 
 	if($result->isSuccess())
 	{
-		if (strlen($save)>0)
-		{
-			LocalRedirect("bookscatalog_authors_list.php?lang=".LANGUAGE_ID);
-		}
+		if ($apply != "")
+			LocalRedirect(
+				"/bitrix/admin/".$arAdminUrls['edit']."?ID=".$ID
+					."&mess=ok&lang=".LANG."&".$tabControl->ActiveTabParam());
 		else
-		{
-			LocalRedirect("bookscatalog_authors_edit.php?ID=".intval($ID)."&lang=".LANGUAGE_ID."&".$tabControl->ActiveTabParam());
-		}
+			LocalRedirect("/bitrix/admin/".$arAdminUrls['list']."?lang=".LANG);
 	}
 	else
 	{
-		$errors = $result->getErrorMessages();
+		$errMessages = $result->getErrorMessages();
+		$bVarsFromForm = true;
 	}
 }
 
-// menu
-$aMenu = array(
-	array(
-		"TEXT"	=> 'Вернуться в список',
-		"TITLE"	=> 'Вернуться в список',
-		"LINK"	=> "bookscatalog_authors_list.php?&lang=".LANGUAGE_ID,
-		"ICON"	=> "btn_list",
-	)
-);
+// ************************************************************************** //
+//         Выборка и подготовка данных для формы                              //
+// ************************************************************************** //
 
-$context = new CAdminContextMenu($aMenu);
+// значения по умолчанию
+$str_NAME      = '';
+$str_LAST_NAME = '';
+
+if($ID > 0)
+{
+	$author = AuthorTable::getRowByID($ID);
+	if($author)
+	{
+		$str_NAME = $author['NAME'];
+		$str_LAST_NAME = $author['LAST_NAME'];
+	}
+	else
+		$ID = 0;
+}
+
+// если данные переданы из формы, инициализируем их
+if($bVarsFromForm)
+	$DB->InitTableVarsForEdit(AuthorTable::getTableName(), "", "str_");
+
+// ************************************************************************** //
+//         Вывод данных                                                       //
+// ************************************************************************** //
+
+// установим заголовок страницы
+$APPLICATION->SetTitle($ID > 0 ? 'Редактирование автора' : 'Добавление нового автора');
 
 require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/prolog_admin_after.php';
 
-$context->Show();
-
-
-if (!empty($errors))
+// Задание параметров административного меню
+$aMenu = array(
+	array(
+		"TEXT"  => 'Вернуться в список',
+		"TITLE" => 'Вернуться в список',
+		"LINK"  => $arAdminUrls['list']."?lang=".LANG,
+		"ICON"  => "btn_list",
+	)
+);
+if($ID > 0)
 {
-	CAdminMessage::ShowMessage(join("\n", $errors));
+	$aMenu[] = array("SEPARATOR"=>"Y");
+
+	$aMenu[] = array(
+		"TEXT"  => 'Добавить автора',
+		"TITLE" => 'Добавить автора',
+		"LINK"  => $arAdminUrls['edit']."?lang=".LANG,
+		"ICON"  => "btn_new",
+	);
+	$aMenu[] = array(
+		"TEXT"  => 'Удалить автора',
+		"TITLE" => 'Удалить автора',
+		"LINK"  => "javascript:if(confirm('Будет удалена вся информация, связанная с этим автором. Продолжить?'))".
+			"window.location='".$arAdminUrls['edit']."?ID=".$ID."&action=delete&lang=".LANG."&".bitrix_sessid_get()."';",
+		"ICON"  => "btn_delete",
+	);
 }
+$context = new CAdminContextMenu($aMenu);
+$context->Show(); // выведем меню
 
-$tabControl->BeginPrologContent();
+// Если есть сообщения об ошибках или об успешном сохранении - выведем их.
+if($_REQUEST["mess"] == "ok" && $ID > 0)
+	CAdminMessage::ShowMessage(array("MESSAGE"=>'Автор сохранён', "TYPE"=>"OK"));
+if (!empty($errMessages))
+	CAdminMessage::ShowMessage(join("\n", $errMessages));
 
-echo $USER_FIELD_MANAGER->ShowScript();
 
-echo CAdminCalendar::ShowScript();
-
-$tabControl->EndPrologContent();
-$tabControl->BeginEpilogContent();
+// ************************************************************************** //
+//         Форма                                                              //
+// ************************************************************************** //
 ?>
 
-<?=bitrix_sessid_post()?>
-	<input type="hidden" name="ID" value="<?=htmlspecialcharsbx(!empty($row)?$row['ID']:'')?>">
-	<input type="hidden" name="lang" value="<?=LANGUAGE_ID?>">
-
-<?$tabControl->EndEpilogContent();?>
-
-<? $tabControl->Begin(array(
-	"FORM_ACTION" => $APPLICATION->GetCurPage()."?ID=".IntVal($ID)."&lang=".LANG
-));?>
-
-<? $tabControl->BeginNextFormTab(); ?>
-
-<? $tabControl->AddViewField("ID", "ID", !empty($row)?$row['ID']:''); ?>
+<form method="POST" action="<?echo $APPLICATION->GetCurPage()?>" name="post_form">
+<?echo bitrix_sessid_post();?>
+<input type="hidden" name="lang" value="<?=LANG?>">
+<?if($ID > 0 && !$bCopy):?>
+	<input type="hidden" name="ID" value="<?=$ID?>">
+<?endif;?>
 <?
-// ----------------- ВЫВОДИМ ПОЛЯ ФОРМЫ -----------------
-$tabControl->AddEditField("NAME", "Имя", true, array('size' => 50), !empty($row['NAME'])?$row['NAME']:'');
-$tabControl->AddEditField("LAST_NAME", "Фамилия", true, array('size' => 50), !empty($row['LAST_NAME'])?$row['LAST_NAME']:'');
-
-if(!empty($row['ACT_HREF']))
-{
-	$flhjr = '<a href="' . $row['ACT_HREF'] . '" target="_blank">скачать ' . $row['ACT_FILE'] . '</a>';
-	$tabControl->AddViewField("ACT_HREF", "Уже загруженный файл", $flhjr);
-}
-
-$tabControl->Buttons(array("disabled" => $disable, "back_url"=>"highloadblock_rows_list.php?lang=".LANGUAGE_ID));
-$tabControl->Show();
+$tabControl->Begin();
+$tabControl->BeginNextTab();
 ?>
-	</form>
+	<tr id="tr_NAME">
+		<td width="40%">
+			<span class="required">*</span>
+			Имя:
+		</td>
+		<td width="60%">
+			<input type="text" name="NAME" value="<?=$str_NAME?>" size="50" maxlength="255">
+		</td>
+	</tr>
 
-<?php
+	<tr id="tr_LAST_NAME">
+		<td width="40%">
+			<span class="required">*</span>
+			Фамилия:
+		</td>
+		<td width="60%">
+			<input type="text" name="LAST_NAME" value="<?=$str_LAST_NAME?>" size="50" maxlength="255">
+		</td>
+	</tr>
+<?
+$tabControl->Buttons(
+	array(
+		"disabled" => ($POST_RIGHT < "W"),
+		"back_url" => $arAdminUrls['list']."?lang=".LANG,
+	)
+);
+// завершаем интерфейс закладки
+$tabControl->End();
+// $tabControl->ShowWarnings("post_form", $errAdminMessage);
+?>
+</form>
+
+<?
 require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/epilog_admin.php';
