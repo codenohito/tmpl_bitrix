@@ -7,58 +7,90 @@ use Cnh\BooksCatalog\AuthorTable;
 
 defined('ADMIN_MODULE_NAME') or define('ADMIN_MODULE_NAME', 'cnh.bookscatalog');
 
+$arAdminUrls = array(
+	'list' => 'bookscatalog_authors_list.php',
+	'edit' => 'bookscatalog_authors_edit.php'
+);
+
 require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/prolog_admin_before.php';
 
 Loc::loadMessages(__FILE__);
 
-if (!CModule::IncludeModule(ADMIN_MODULE_NAME))
+// проверяем, подключен ли наш модуль и есть ли на него права у текущего пользователя
+$POST_RIGHT = $APPLICATION->GetGroupRight(ADMIN_MODULE_NAME);
+if ((!CModule::IncludeModule(ADMIN_MODULE_NAME)) || ($POST_RIGHT == "D"))
 {
-	$APPLICATION->AuthForm(GetMessage("ACCESS_DENIED"));
+	$APPLICATION->AuthForm(Loc::getMessage("ACCESS_DENIED"));
 }
 
-$entity = AuthorTable::getEntity();
-$entity_data_class = $entity->getDataClass();
-$entity_table_name = AuthorTable::getTableName();
+$sTableID = "tbl_".AuthorTable::getTableName();
+$oSort = new CAdminSorting($sTableID, "ID", "desc"); // объект сортировки
+$lAdmin = new CAdminList($sTableID, $oSort); // основной объект списка
 
-$sTableID = 'tbl_'.$entity_table_name;
-$oSort = new CAdminSorting($sTableID, "ID", "asc");
-$lAdmin = new CAdminList($sTableID, $oSort);
+// ******************************************************************** //
+//                           Фильтр                                     //
+// ******************************************************************** //
+function CheckFilter($arrFilterForCheck)
+{
+	global $lAdmin;
+	foreach ($arrFilterForCheck as $f) global $$f;
+	// Проверяем значения переменных $find_ИМЯ и, в случае возникновения
+	// ошибки, вызываем $lAdmin->AddFilterError("текст_ошибки").
+	return count($lAdmin->arFilterErrors) == 0; // если ошибки есть, то false
+}
 
-$arFilterFields = array(
-	'find_id',
-	'find_name',
-	'find_last_name'
+// опишем элементы фильтра и инициализируем его
+$FilterArr = Array(
+	"find_id",
+	"find_name"
 );
-function CheckFilter($FilterArr) // проверка введенных полей
+$lAdmin->InitFilter($FilterArr);
+
+if (CheckFilter($FilterArr))
 {
-	foreach($FilterArr as $f)
-		global $$f;
+	$arFilter = Array(); // массив фильтрации для выборки GetList()
+	if (!empty($find_id)) $arFilter['ID'] = $find_id;
+	if (!empty($find_name)) $arFilter['%NAME'] = $find_name;
+}
 
-	$str = "";
+// ******************************************************************** //
+//                Обработка действий над элементами списка              //
+// ******************************************************************** //
 
-	if(strlen($str)>0)
+// сохранение отредактированных элементов
+/* TODO отработать, протестировать
+if($lAdmin->EditAction() && $POST_RIGHT=="W")
+{
+  // пройдем по списку переданных элементов
+  foreach($FIELDS as $ID=>$arFields)
+  {
+	if(!$lAdmin->IsUpdated($ID))
+	  continue;
+
+	// сохраним изменения каждого элемента
+	$DB->StartTransaction();
+	$ID = IntVal($ID);
+	$cData = new AuthorTable;
+	if(($rsData = $cData->getByID($ID)) && ($arData = $rsData->fetch()))
 	{
-		global $lAdmin;
-		$lAdmin->AddFilterError($str);
-		return false;
+	  foreach($arFields as $key=>$value)
+		$arData[$key]=$value;
+	  if(!$cData->Update($ID, $arData))
+	  {
+		$lAdmin->AddGroupError("Ошибка сохранения: ".$cData->LAST_ERROR, $ID);
+		$DB->Rollback();
+	  }
 	}
-
-	return true;
+	else
+	{
+	  $lAdmin->AddGroupError("Ошибка сохранения: нет автора с id", $ID);
+	  $DB->Rollback();
+	}
+	$DB->Commit();
+  }
 }
 
-$arFilter = Array();
-$lAdmin->InitFilter($arFilterFields);
-InitSorting();
-
-if(CheckFilter($arFilterFields))
-{
-	if (!empty($find_id))
-		$arFilter['=ID'] = $find_id;
-	if (!empty($find_name))
-		$arFilter['=NAME'] = $find_name;
-	if (!empty($find_last_name))
-		$arFilter['=LAST_NAME'] = $find_last_name;
-}
+// OR ----------->
 
 if($lAdmin->EditAction())
 {
@@ -77,156 +109,253 @@ if($lAdmin->EditAction())
 		if(!$entity_data_class::update($ID, $arFields))
 		{
 			$e = $APPLICATION->GetException();
-			$lAdmin->AddUpdateError(GetMessage("SAVE_ERROR").$ID.": ".$e->GetString(), $ID);
+			$lAdmin->AddUpdateError(Loc::getMessage("SAVE_ERROR").$ID.": ".$e->GetString(), $ID);
 			$DB->Rollback();
 		}
 		$DB->Commit();
 	}
 }
+*/
 
-if($arID = $lAdmin->GroupAction())
+// обработка одиночных и групповых действий
+if(($arID = $lAdmin->GroupAction()) && $POST_RIGHT=="W")
 {
+	// если выбрано "Для всех элементов" выберем все элементы (с учетом фильтра)
 	if($_REQUEST['action_target']=='selected')
 	{
-		$arID = array();
-
-		$rsData = $entity_data_class::getList(array(
-			"select" => array('ID'),
-			"filter" => $arFilter
-		));
-
-		while($arRes = $rsData->Fetch())
-			$arID[] = $arRes['ID'];
+	$cData = new AuthorTable;
+	$rsData = AuthorTable::getList(array(
+		"select" => array('ID'),
+		"filter" => $arFilter,
+		"order" => array($by => $order)
+	));
+	while($arRes = $rsData->fetch())
+		$arID[] = $arRes['ID'];
 	}
 
-	foreach ($arID as $ID)
+	foreach($arID as $ID)
 	{
-		$ID = (int)$ID;
-		if (!$ID || $ID<=0)
+		if(strlen($ID)<=0)
 			continue;
+		$ID = IntVal($ID);
 
+		// для каждого элемента совершим требуемое действие
 		switch($_REQUEST['action'])
 		{
 			case "delete":
-				// if( Access::getInstance()->checkRigth__Document($ID) ) {
-					if(!$entity_data_class::delete($ID))
-						$lAdmin->AddGroupError(GetMessage("DELETE_ERROR"), $ID);
-				// }
+				@set_time_limit(0);
+				$DB->StartTransaction();
+				if(!AuthorTable::delete($ID))
+				{
+					$DB->Rollback();
+					$lAdmin->AddGroupError('Ошибка удаления', $ID);
+				}
+				$DB->Commit();
 				break;
 		}
 	}
 }
+// ******************************************************************** //
+//                Выборка элементов списка                              //
+// ******************************************************************** //
 
-// $q = new Bitrix\Main\Entity\Query(AuthorTable::getEntity());
-// $q->setSelect(array('*'));
-// $q->setFilter($arFilter);
-// echo('<p><pre>');print_r($q->getQuery());echo('</pre></p>');
-
-$authorsList = $entity_data_class::GetList(array(
+// выберем список рассылок
+$rsData = AuthorTable::getList(array(
 	"filter" => $arFilter,
 	"order" => array($by => $order)
 ));
-$rsData = new CAdminResult($authorsList, $sTableID);
-$rsData->NavStart(20);
-$lAdmin->NavText($rsData->GetNavPrint(GetMessage("PAGES")));
+
+// echo "<p><pre>"; print_r($rsData); echo "</pre></p>";
+
+// преобразуем список в экземпляр класса CAdminResult
+$rsData = new CAdminResult($rsData, $sTableID);
+
+// аналогично CDBResult инициализируем постраничную навигацию.
+$rsData->NavStart();
+
+// отправим вывод переключателя страниц в основной объект $lAdmin
+$lAdmin->NavText($rsData->GetNavPrint('Записи'));
+
+// ******************************************************************** //
+//                Подготовка списка к выводу                            //
+// ******************************************************************** //
+
 $lAdmin->AddHeaders(array(
 	array(
-		"id"=>"ID",
-		"content"=>"ID",
-		"sort"=>"ID",
-		"default"=>true,
-		"align"=>"right"),
+		"id"      => "ID",
+		"content" => "ID",
+		"sort"    => "id",
+		"align"   => "right",
+		"default" => true
+	),
 	array(
-		"id"=>"NAME",
-		"content"=>"Имя",
-		"sort"=>"NAME",
-		"default"=>true),
-	array("id"=>"LAST_NAME",
-		"content"=>"Фамилия",
-		"sort"=>"LAST_NAME",
-		"default"=>true)
+		"id"      => "NAME",
+		"content" => "Имя",
+		"sort"    =>"name",
+		"default" => true
+	),
+	array(
+		"id"      => "LAST_NAME",
+		"content" => "Фамилия",
+		"sort"    => "last_name",
+		"default" => true
+	)
 ));
 
-while($db_res = $rsData->NavNext(true, "a_"))
+while($arRes = $rsData->NavNext(true, "f_"))
 {
-	$row =& $lAdmin->AddRow($a_ID,$db_res);
-	$row->AddField("ID", $a_ID);
-	$row->AddField("NAME", $a_NAME);
-	$row->AddField("LAST_NAME", $a_LAST_NAME);
+	// создаем строку. результат - экземпляр класса CAdminListRow
+	$row =& $lAdmin->AddRow($f_ID, $arRes);
 
-	$arActions = array();
+	// далее настроим отображение значений при просмотре и редактировании списка
+
+    // $row->AddField("ID", $f_ID); // поле ставится автоматически
+
+	// параметр NAME будет редактироваться как текст, а отображаться ссылкой
+	// $row->AddInputField("NAME", array("size"=>20));
+	$row->AddViewField("NAME", '<a href="'.$arAdminUrls['edit'].'?ID='.$f_ID.'&lang='.LANG.'">'.$f_NAME.'</a>');
+
+	// $row->AddInputField("LAST_NAME", array("size"=>20));
+	$row->AddField("LAST_NAME", $f_LAST_NAME);
+
+	// $row->AddEditField("LID", CLang::SelectBox("LID", $f_LID));
+	// $row->AddInputField("SORT", array("size"=>20));
+	// $row->AddCheckField("ACTIVE");
+	// $row->AddCheckField("VISIBLE");
+	// $row->AddViewField("AUTO", $f_AUTO=="Y"?Loc::getMessage("POST_U_YES"):Loc::getMessage("POST_U_NO"));
+	// $row->AddEditField("AUTO", "<b>".($f_AUTO=="Y"?Loc::getMessage("POST_U_YES"):Loc::getMessage("POST_U_NO"))."</b>");
+
+	// сформируем контекстное меню
+	$arActions = Array();
+
+	// редактирование элемента
 	$arActions[] = array(
-		"ICON" => "edit",
-		"TEXT" => GetMessage("MAIN_ADMIN_MENU_EDIT"),
-		"ACTION" => $lAdmin->ActionRedirect("bookscatalog_authors_edit.php?&ID=".$a_ID.'&lang='.LANGUAGE_ID),
-		"DEFAULT" => true
-		);
-	$arActions[] = array(
-		"ICON" => "delete",
-		"TEXT" => GetMessage("MAIN_ADMIN_MENU_DELETE"),
-		"ACTION" => "if(confirm('".GetMessage('MAIN_AGENT_ALERT_DELETE')."')) ".$lAdmin->ActionDoGroup($a_ID, "delete")
+		"ICON"    => "edit",
+		"DEFAULT" => true,
+		"TEXT"    => 'Редактировать',
+		"ACTION"  => $lAdmin->ActionRedirect($arAdminUrls['edit']."?ID=".$f_ID)
 	);
 
+	$arActions[] = array("SEPARATOR"=>true);
+
+	// удаление элемента
+	if ($POST_RIGHT>="W")
+		$arActions[] = array(
+			"ICON"   => "delete",
+			"TEXT"   => 'Удалить',
+			"ACTION" => "if(confirm('Будет удалена вся информация, связанная с этой записью')) ".$lAdmin->ActionDoGroup($f_ID, "delete")
+		);
+
+	// если последний элемент - разделитель, почистим мусор.
+	if(is_set($arActions[count($arActions)-1], "SEPARATOR"))
+		unset($arActions[count($arActions)-1]);
+
+	// применим контекстное меню к строке
 	$row->AddActions($arActions);
 }
 
-$lAdmin->AddGroupActionTable(
-	array(
-		"delete" => true
-	)
-);
+// Почему-то ни на что не влияет
+// // резюме таблицы
+// $lAdmin->AddFooter(
+// 	array(
+// 		array( // кол-во элементов
+// 			"title" => Loc::getMessage("MAIN_ADMIN_LIST_SELECTED"),
+// 			"value" => $rsData->SelectedRowsCount()
+// 		),
+// 		array( // счетчик выбранных элементов
+// 			"counter" => true,
+// 			"title"   => Loc::getMessage("MAIN_ADMIN_LIST_CHECKED"),
+// 			"value"   => "0"
+// 		)
+// 	)
+// );
+
+// групповые действия
+$lAdmin->AddGroupActionTable(array(
+	"delete" => Loc::getMessage("MAIN_ADMIN_LIST_DELETE")
+));
+
+// ******************************************************************** //
+//                Административное меню                                 //
+// ******************************************************************** //
+
+// сформируем меню из одного пункта - добавление элемента
 $aContext = array(
 	array(
-		"TEXT"	=> 'Добавить автора',
-		"LINK"	=> "bookscatalog_authors_edit.php?lang=".LANG,
-		"TITLE"	=> 'Добавить автора',
-		"ICON"	=> "btn_new"
-	),
+		"TEXT"  => 'Добавить автора',
+		"LINK"  => $arAdminUrls['edit']."?lang=".LANG,
+		"TITLE" => 'Добавить автора',
+		"ICON"  => "btn_new"
+	)
 );
+
+// и прикрепим его к списку
 $lAdmin->AddAdminContextMenu($aContext);
 
-$APPLICATION->SetTitle('Авторы');
-$lAdmin->CheckListMode();
+// ******************************************************************** //
+//                Вывод                                                 //
+// ******************************************************************** //
 
-require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/prolog_admin_after.php';
-?>
-<form name="find_form" method="GET" action="<?echo $APPLICATION->GetCurPage()?>?">
-<input type="hidden" name="lang" value="<?echo LANG?>">
-<?
+$lAdmin->CheckListMode(); // альтернативный вывод
+$APPLICATION->SetTitle("Авторы");
+
+require($_SERVER["DOCUMENT_ROOT"]."/bitrix/modules/main/include/prolog_admin_after.php");
+
+// ******************************************************************** //
+//                Вывод фильтра                                         //
+// ******************************************************************** //
+
+// создадим объект фильтра
 $oFilter = new CAdminFilter(
 	$sTableID."_filter",
 	array(
-		'ID',
-		'Компания',
-		'Название компании',
-		'ИНН компании',
-		'Номер контрагента',
-		'Документ',
-		'Год'
+		"ID",
+		"Имя",
 	)
 );
-
-$oFilter->Begin();
 ?>
+<form name="find_form" method="get" action="<?echo $APPLICATION->GetCurPage();?>">
+<?$oFilter->Begin();?>
+<!-- <tr>
+	<td><b><?//=Loc::getMessage("rub_f_find")?>:</b></td>
+	<td>
+		<input type="text" size="25" name="find" value="<?// echo htmlspecialchars($find)?>" title="<?//=Loc::getMessage("rub_f_find_title")?>">
+		<?/*
+		$arr = array(
+			"reference" => array(
+				"ID",
+			),
+			"reference_id" => array(
+				"id",
+			)
+		);
+		echo SelectBoxFromArray("find_type", $arr, $find_type, "", "");
+		*/
+		?>
+	</td>
+</tr> -->
 <tr>
-	<td>ID:</td>
-	<td><input type="text" name="find_id" size="47" value="<?echo htmlspecialcharsbx($find_id)?>"></td>
+	<td><?="ID"?>:</td>
+	<td>
+		<input type="text" name="find_id" size="47" value="<?echo htmlspecialchars($find_id)?>">
+	</td>
 </tr>
 <tr>
-	<td>Имя:</td>
-	<td><input type="text" name="find_name" size="47" value="<?echo htmlspecialcharsbx($find_name)?>"></td>
-</tr>
-<tr>
-	<td>Фамилия:</td>
-	<td><input type="text" name="find_last_name" size="47" value="<?echo htmlspecialcharsbx($find_last_name)?>"></td>
+	<td><?="Имя:"?></td>
+	<td><input type="text" name="find_name" size="60" value="<?echo htmlspecialchars($find_name)?>"></td>
 </tr>
 <?
-$oFilter->Buttons(array("table_id"=>$sTableID, "url"=>$APPLICATION->GetCurPage(), "form"=>"find_form"));
+$oFilter->Buttons(array(
+	"table_id" => $sTableID,
+	"url"      => $APPLICATION->GetCurPage(),
+	"form"     => "find_form"
+));
 $oFilter->End();
 ?>
 </form>
+
 <?
+$lAdmin->DisplayList(); // выведем таблицу списка элементов
 
-$lAdmin->DisplayList();
-
-require_once $_SERVER['DOCUMENT_ROOT'].'/bitrix/modules/main/include/epilog_admin.php';
+require($_SERVER["DOCUMENT_ROOT"]."/bitrix/modules/main/include/epilog_admin.php");
+?>
