@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS `cnh_bookscatalog_book` (
 	`TITLE` varchar(255) NOT NULL,
 	`PUBLISH_DATE` date NOT NULL,
 	`AUTHOR_ID` int NOT NULL,
-	PRIMARY KEY(`ID`)
+	PRIMARY KEY(`ID`),
+	INDEX IX_AUTHOR_ID (AUTHOR_ID));
 );
 
 CREATE TABLE IF NOT EXISTS `cnh_bookscatalog_tag` (

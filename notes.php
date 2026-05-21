@@ -78,6 +78,26 @@ while ($row = $result->fetch())
 // $rows = BookTable::getList($parameters)->fetchAll();
 // https://dev.1c-bitrix.ru/learning/course/index.php?COURSE_ID=43&LESSON_ID=5753
 
+// аналогично через Entity\Query
+$queryParams = array(
+	'select' => array('ISBN', 'TITLE', 'PUBLISH_DATE'),
+	'filter' => array('=ID' => 1)
+);
+$q = new \Bitrix\Main\Entity\Query(TicketTable::getEntity());
+if (!empty($queryParams['select'])) $q->setSelect($queryParams['select']);
+if (!empty($queryParams['filter'])) $q->setFilter($queryParams['filter']);
+if (!empty($queryParams['group'])) $q->setGroup($queryParams['group']);
+if (!empty($queryParams['order'])) $q->setOrder($queryParams['order']);
+if (!empty($queryParams['limit'])) $q->setLimit($queryParams['limit']);
+if (!empty($queryParams['offset'])) $q->setOffset($queryParams['offset']);
+// Show the query string
+echo '<p><pre>';
+print_r($q->getQuery());
+echo '</pre></p>';
+// Get the result
+$result = $q->exec();
+
+
 // ---
 \SomePartner\MyBooksCatalog\TagTable::getList(array(
 	'filter' => array('=ID' => 11),

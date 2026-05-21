@@ -80,6 +80,7 @@ class BookTable extends Entity\DataManager
 			// new Entity\EnumField('NAME', array(
 			// 	'values' => array('VALUE1', 'VALUE2', 'VALUE3')
 			// )),
+			// Entity\DateTimeField
 		);
 	}
 
