@@ -1,6 +1,9 @@
 Шаблон проекта 1С-Битрикс
 =========================
 
+> [!WARNING]
+> This project has been archived and is no longer supported.
+
 This is a template of Bitrix Framework project.
 
 Проверено на 1С-Битрикс: Управление сайтом 17.0.9.
